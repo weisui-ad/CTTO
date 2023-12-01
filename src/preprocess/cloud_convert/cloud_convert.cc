@@ -36,6 +36,9 @@ namespace zjloc
         case LidarType::LIVOX:
             LivoxHandler(msg);
             break;
+        case LidarType::DTOF:
+            DTofHander(msg);
+            break;
 
         default:
             LOG(ERROR) << "Error LiDAR Type: " << int(lidar_type_);
@@ -168,8 +171,8 @@ namespace zjloc
         }
     }
 
-    void CloudConvert::RobosenseHandler(const sensor_msgs::PointCloud2::ConstPtr &msg)
-    {
+    void CloudConvert::RobosenseHandler(const sensor_msgs::PointCloud2::ConstPtr &msg){
+
         cloud_out_.clear();
         cloud_full_.clear();
         pcl::PointCloud<robosense_ros::Point> pl_orig;
@@ -349,8 +352,8 @@ namespace zjloc
         }
     }
 
-    void CloudConvert::LivoxHandler(const sensor_msgs::PointCloud2::ConstPtr &msg)
-    {
+    void CloudConvert::LivoxHandler(const sensor_msgs::PointCloud2::ConstPtr &msg){
+
         cloud_out_.clear();
         cloud_full_.clear();
 
@@ -401,6 +404,69 @@ namespace zjloc
             point_temp.alpha_time = point_temp.relative_time / timespan_;
             point_temp.timespan = timespan_;
             point_temp.ring = pl_orig.points[i].ring;
+
+            cloud_out_.push_back(point_temp);
+        }
+    }
+
+    /**
+     * sensor_msgs::PointCloud2 存在timestamp的属性，并且时间单位是s
+    */
+    void CloudConvert::DTofHander(const sensor_msgs::PointCloud2::ConstPtr &msg){
+
+        cloud_out_.clear();
+        cloud_full_.clear();
+
+        pcl::PointCloud<dtof_ros::Point> pl_orig;
+        pcl::fromROSMsg(*msg, pl_orig);
+        int plsize = pl_orig.size();
+        cloud_out_.reserve(plsize);
+
+        // 点云的时间戳
+        double headertime = msg->header.stamp.toSec();
+        //  FIXME:  时间戳大于0.1
+        auto time_list_dtof = [&](dtof_ros::Point &point_1, dtof_ros::Point &point_2){
+            return (point_1.timestamp < point_2.timestamp);
+        };
+        // 将每个点按照时间戳进行排序
+        sort(pl_orig.points.begin(), pl_orig.points.end(), time_list_dtof);
+        // 剔除timespan > 0.1的点 // timestamp 
+        while (pl_orig.points[plsize - 1].timestamp - pl_orig.points[0].timestamp >= 0.1){
+            plsize--;
+            pl_orig.points.pop_back();
+        }
+
+        // 计算timespan_
+        timespan_ = pl_orig.points.back().timestamp - pl_orig.points[0].timestamp;
+        for (int i = 0; i < pl_orig.points.size(); i++){
+           
+            // if (i % point_filter_num_ != 0)
+            //     continue;
+            if (!(std::isfinite(pl_orig.points[i].x) &&
+                  std::isfinite(pl_orig.points[i].y) &&
+                  std::isfinite(pl_orig.points[i].z)))
+                continue;
+
+            double range = pl_orig.points[i].x * pl_orig.points[i].x + pl_orig.points[i].y * pl_orig.points[i].y +
+                           pl_orig.points[i].z * pl_orig.points[i].z;
+
+            // 仅保留[0.1m, 15m]范围内的点
+            if (range > 15 * 15 || range < blind * blind)
+                continue;
+
+            point3D point_temp;
+            point_temp.raw_point = Eigen::Vector3d(pl_orig.points[i].x, pl_orig.points[i].y, pl_orig.points[i].z);
+            point_temp.point = point_temp.raw_point;
+            point_temp.relative_time = pl_orig.points[i].timestamp - pl_orig.points[0].timestamp; // curvature unit: s
+            point_temp.intensity = pl_orig.points[i].intensity;
+
+            // point_temp.timestamp = headertime + point_temp.relative_time;
+            point_temp.timestamp = pl_orig.points[i].timestamp;
+            point_temp.alpha_time = point_temp.relative_time / timespan_;
+            point_temp.timespan = timespan_; // 这个点云的时间跨度
+            point_temp.ring = pl_orig.points[i].ring;
+            if (point_temp.alpha_time > 1 || point_temp.alpha_time < 0)
+                std::cout << point_temp.alpha_time << ", this may error." << std::endl;
 
             cloud_out_.push_back(point_temp);
         }

@@ -2,7 +2,7 @@ YAML: 1.0
 
 preprocess:
   point_filter_num: 3  #点云下采样
-  lidar_type: 1  # 1-AVIA 2-velodyne 3-ouster  4-robosense 5-pandar 6-livox
+  lidar_type: 1  # 1-AVIA 2-velodyne 3-ouster  4-robosense 5-pandar 6-livox 7-dtof
   blind: 0.1
 
 

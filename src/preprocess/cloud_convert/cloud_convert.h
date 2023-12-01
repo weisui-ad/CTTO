@@ -31,6 +31,7 @@ namespace zjloc
             ROBOSENSE16, //  速腾16线
             PANDAR,
             LIVOX,
+            DTOF         // DTOF
         };
 
         CloudConvert() = default;
@@ -69,6 +70,7 @@ namespace zjloc
         void RobosenseHandler(const sensor_msgs::PointCloud2::ConstPtr &msg);
         void PandarHandler(const sensor_msgs::PointCloud2::ConstPtr &msg);
         void LivoxHandler(const sensor_msgs::PointCloud2::ConstPtr &msg);
+        void DTofHander(const sensor_msgs::PointCloud2::ConstPtr &msg);
 
         // FullPointCloudType cloud_full_, cloud_out_; // 输出点云
         std::vector<point3D> cloud_full_, cloud_out_; //  输出点云
