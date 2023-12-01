@@ -146,22 +146,23 @@ namespace zjloc
           Vec3d g_{0, 0, -9.8};
 
           /// @brief 数据管理及同步
-          std::deque<std::vector<point3D>> lidar_buffer_;
+          std::deque<std::vector<point3D>> lidar_buffer_;  // lidar点云
           double last_timestamp_lidar_ = 0;     // 最近lidar时间
           double last_stamp_process_ = DBL_MAX; //
-          std::deque<std::pair<double, double>> time_buffer_;
+          std::deque<std::pair<double, double>> time_buffer_; // <time_begin, time_span>
 
           /// @brief mutex
           std::mutex mtx_buf;
           std::mutex mtx_state;
           std::condition_variable cond;
 
-          state *current_state;
+          state *current_state;        // 当前的状态
           std::vector<state *> all_state_frame; //   多保留一份state，这样可以不用去缓存all_cloud_frame
 
           std::function<bool(std::string &topic_name, CloudPtr &cloud, double time)> pub_cloud_to_ros;
           std::function<bool(std::string &topic_name, SE3 &pose, double time)> pub_pose_to_ros;
           std::function<bool(std::string &topic_name, double time1, double time2)> pub_data_to_ros;
+          
           pcl::PointCloud<pcl::PointXYZI>::Ptr points_world;
      };
 }

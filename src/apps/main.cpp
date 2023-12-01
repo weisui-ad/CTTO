@@ -5,7 +5,7 @@
 #include <queue>
 #include <thread>
 #include <chrono>
-#include <functional>
+#include <functional>   
 
 // ros lib
 #include <ros/ros.h>
@@ -35,27 +35,31 @@ zjloc::CloudConvert *convert;
 DEFINE_string(config_yaml, "./config/mapping.yaml", "配置文件");
 #define DEBUG_FILE_DIR(name) (std::string(std::string(ROOT_DIR) + "log/" + name))
 
-void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg)
-{
+/**
+ * 将rosbag的数据转换后，放入lidar_buffer_.push_back(msg)，time_buffer_.push_back(data)中
+*/
+void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg){
 
     //std::cout<<"convert CustomMsg to cloud_out ...";
+    // 将livox_ros_driver::CustomMsg 转化成 std::vector<point3D>
     std::vector<point3D> cloud_out;
     zjloc::common::Timer::Evaluate([&]()
                                    { convert->Process(msg, cloud_out); },
-                                   "laser convert");
+                                   "laser convert"
+                                   );
 
     zjloc::common::Timer::Evaluate([&]()
                                    { 
+
+        // 20 帧以内，按照0.01m采样，20帧以后按照0.05m采样
         double sample_size = lio->getIndex() < 20 ? 0.01 : 0.05;
         // double sample_size = 0.01;
         std::mt19937_64 g;
         std::shuffle(cloud_out.begin(), cloud_out.end(), g);
         subSampleFrame(cloud_out, sample_size);
-        std::shuffle(cloud_out.begin(), cloud_out.end(), g); },
-                                   "laser ds");
+        std::shuffle(cloud_out.begin(), cloud_out.end(), g); },"laser ds");
 
     lio->pushData(cloud_out, std::make_pair(msg->header.stamp.toSec(), convert->getTimeSpan()));
-
     //std::cout<<"  done"<<std::endl;
 }
 
@@ -75,15 +79,14 @@ void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg){
         std::shuffle(cloud_out.begin(), cloud_out.end(), g);
         subSampleFrame(cloud_out, sample_size);   // 对点云进行下采样
         std::shuffle(cloud_out.begin(), cloud_out.end(), g);
-    },
-                                   "laser ds");
+    },"laser ds");
 
     // lio->pushData(cloud_out, std::make_pair(msg->header.stamp.toSec() - convert->getTimeSpan(), convert->getTimeSpan())); //  FIXME: for staircase dataset(header timestamp is the frame end)
     lio->pushData(cloud_out, std::make_pair(msg->header.stamp.toSec(), convert->getTimeSpan())); //  normal
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv){
+
     google::InitGoogleLogging(argv[0]);
     FLAGS_stderrthreshold = google::INFO;
     FLAGS_colorlogtostderr = true;
@@ -96,18 +99,19 @@ int main(int argc, char **argv)
     //std::string config_file = std::string("/home/suiwei/ws_ctlo/src/CTLO/config/mapping.yaml");
     std::cout << ANSI_COLOR_GREEN << "config_file:" << config_file << ANSI_COLOR_RESET << std::endl;
 
-
+    // 创建并且加载配置文件
     lio = new zjloc::lidarodom();
     if (!lio->init(config_file)){
          return -1;
      }
- 
 
     // pubshlier
     ros::Publisher pub_scan = nh.advertise<sensor_msgs::PointCloud2>("scan", 10);
+    /**
+     * 定义函数，用于发布数据，将pcl::PointCloud 转化成sensor_msgs::PointCloud2, 并且通过ros进行发布
+     */
     auto cloud_pub_func = std::function<bool(std::string & topic_name, zjloc::CloudPtr & cloud, double time)>(
-        [&](std::string &topic_name, zjloc::CloudPtr &cloud, double time)
-        {
+        [&](std::string &topic_name, zjloc::CloudPtr &cloud, double time){
             sensor_msgs::PointCloud2Ptr cloud_ptr_output(new sensor_msgs::PointCloud2());
             pcl::toROSMsg(*cloud, *cloud_ptr_output);
 
@@ -122,19 +126,25 @@ int main(int argc, char **argv)
 
     );
 
+    // odometry publisher
     ros::Publisher pubLaserOdometry = nh.advertise<nav_msgs::Odometry>("/odom", 100);
+    // odometry path publisher
     ros::Publisher pubLaserOdometryPath = nh.advertise<nav_msgs::Path>("/odometry_path", 5);
+    /**
+     * define pose publis function
+     * pose是base_link 在map中的位姿？
+    */
     auto pose_pub_func = std::function<bool(std::string & topic_name, SE3 & pose, double stamp)>(
-        [&](std::string &topic_name, SE3 &pose, double stamp)
-        {
+        [&](std::string &topic_name, SE3 &pose, double stamp){
+
             static tf::TransformBroadcaster br;
             tf::Transform transform;
             Eigen::Quaterniond q_current(pose.so3().matrix());
             transform.setOrigin(tf::Vector3(pose.translation().x(), pose.translation().y(), pose.translation().z()));
             tf::Quaternion q(q_current.x(), q_current.y(), q_current.z(), q_current.w());
             transform.setRotation(q);
-            if (topic_name == "laser")
-            {
+           
+            if (topic_name == "laser"){
                 br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec(stamp), "map", "base_link"));
 
                 // publish odometry
@@ -161,8 +171,7 @@ int main(int argc, char **argv)
                 laserOdoPath.header.frame_id = "/map";
                 pubLaserOdometryPath.publish(laserOdoPath);
             }
-            else if (topic_name == "world")
-            {
+            else if (topic_name == "world"){
                 br.sendTransform(tf::StampedTransform(transform, ros::Time().fromSec(stamp), "world", "map"));
             }
 
@@ -170,23 +179,24 @@ int main(int argc, char **argv)
         }
 
     );
-
+    // velocity publisher
     ros::Publisher vel_pub = nh.advertise<std_msgs::Float32>("/velocity", 1);
+    // distance publisher
     ros::Publisher dist_pub = nh.advertise<std_msgs::Float32>("/move_dist", 1);
+    /**
+     * 定义function, 用于发布velocity或者move_dist
+    */
     auto data_pub_func = std::function<bool(std::string & topic_name, double time1, double time2)>(
-        [&](std::string &topic_name, double time1, double time2)
-        {
-            std_msgs::Float32 time_rviz;
+        [&](std::string &topic_name, double time1, double time2){
 
+            std_msgs::Float32 time_rviz;
             time_rviz.data = time1;
             if (topic_name == "velocity")
                 vel_pub.publish(time_rviz);
             else
                 dist_pub.publish(time_rviz);
-
             return true;
         }
-
     );
 
 
@@ -195,11 +205,13 @@ int main(int argc, char **argv)
     lio->setFunc(pose_pub_func);
     lio->setFunc(data_pub_func);
 
-
+    // 定义数据格式转换器
     convert = new zjloc::CloudConvert;
+    // 加载配置文件
     convert->LoadFromYAML(config_file);
     std::cout << ANSI_COLOR_GREEN_BOLD << "init successful" << ANSI_COLOR_RESET << std::endl;
 
+    // 获取Lidar 和 imu topic
     auto yaml = YAML::LoadFile(config_file);
     std::string laser_topic = yaml["common"]["lid_topic"].as<std::string>();
     std::string imu_topic = yaml["common"]["imu_topic"].as<std::string>();

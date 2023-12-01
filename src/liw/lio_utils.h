@@ -36,20 +36,20 @@ namespace zjloc
           std::deque<IMUPtr> imu_cont;  // 用来处理B样条
      };
 
-     class state
-     {
+     class state{
      public:
      EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-          Eigen::Quaterniond rotation;
-          Eigen::Vector3d translation;
-          Eigen::Vector3d velocity;
-          Eigen::Vector3d ba;
-          Eigen::Vector3d bg;
+          
+          Eigen::Quaterniond rotation;   // rotation
+          Eigen::Vector3d translation;   // translation
+          Eigen::Vector3d velocity;      // velocity
+          Eigen::Vector3d ba;            // bias_angular
+          Eigen::Vector3d bg;            // bias_gyo
 
-          Eigen::Quaterniond rotation_begin;
-          Eigen::Vector3d translation_begin;
-          Eigen::Vector3d velocity_begin;
-          Eigen::Vector3d ba_begin;
+          Eigen::Quaterniond rotation_begin;    // rotation begin
+          Eigen::Vector3d translation_begin;    // translation begin
+          Eigen::Vector3d velocity_begin;       // velocity begin
+          Eigen::Vector3d ba_begin;             
           Eigen::Vector3d bg_begin;
 
           state(const Eigen::Quaterniond &rotation_, const Eigen::Vector3d &translation_,
@@ -61,8 +61,7 @@ namespace zjloc
           void release();
      };
 
-     class cloudFrame
-     {
+     class cloudFrame{
      public:
           EIGEN_MAKE_ALIGNED_OPERATOR_NEW
           double time_frame_begin; //  current frame front stamp
@@ -72,9 +71,8 @@ namespace zjloc
 
           state *p_state;
 
-          std::vector<point3D> point_surf; //  global frame
-          std::vector<point3D> const_surf; //  lidar frame
-
+          std::vector<point3D> point_surf; //  points in global frame
+          std::vector<point3D> const_surf; //  points in lidar frame
           std::vector<point3D> surf_keypoints;
 
           double dt_offset;

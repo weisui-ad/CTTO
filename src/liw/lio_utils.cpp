@@ -50,7 +50,8 @@ namespace zjloc
      }
 
      //   --------------------------------------     //
-     cloudFrame::cloudFrame(std::vector<point3D> &point_surf_, std::vector<point3D> &const_surf_,
+     cloudFrame::cloudFrame(std::vector<point3D> &point_surf_, 
+                           std::vector<point3D> &const_surf_,
                             state *p_state_)
      {
           point_surf.insert(point_surf.end(), point_surf_.begin(), point_surf_.end());

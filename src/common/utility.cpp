@@ -70,11 +70,10 @@ void grid_sampling(const std::vector<point3D> &frame, std::vector<point3D> &keyp
 }
 
 
-void subSampleFrame(std::vector<point3D> &frame, double size_voxel)
-{
+void subSampleFrame(std::vector<point3D> &frame, double size_voxel){
+     
      std::tr1::unordered_map<voxel, std::vector<point3D>, std::hash<voxel>> grid;
-     for (int i = 0; i < (int)frame.size(); i++)
-     {
+     for (int i = 0; i < (int)frame.size(); i++){
           auto kx = static_cast<short>(frame[i].point[0] / size_voxel);
           auto ky = static_cast<short>(frame[i].point[1] / size_voxel);
           auto kz = static_cast<short>(frame[i].point[2] / size_voxel);
@@ -82,10 +81,8 @@ void subSampleFrame(std::vector<point3D> &frame, double size_voxel)
      }
      frame.resize(0);
      int step = 0;
-     for (const auto &n : grid)
-     {
-          if (n.second.size() > 0)
-          {
+     for (const auto &n : grid){
+          if (n.second.size() > 0{
                frame.push_back(n.second[0]);
                step++;
           }
@@ -127,22 +124,29 @@ void distortFrame(std::vector<point3D> &points, Eigen::Quaterniond &q_begin, Eig
      }
 }
 
-void transformPoint(MotionCompensation compensation, point3D &point_temp, Eigen::Quaterniond &q_begin, Eigen::Quaterniond &q_end,
-                    Eigen::Vector3d &t_begin, Eigen::Vector3d &t_end, Eigen::Matrix3d &R_imu_lidar, Eigen::Vector3d &t_imu_lidar)
-{
+// transform point
+void transformPoint(MotionCompensation compensation, 
+                    point3D &point_temp,
+                    Eigen::Quaterniond &q_begin, 
+                    Eigen::Quaterniond &q_end,
+                    Eigen::Vector3d &t_begin, 
+                    Eigen::Vector3d &t_end, 
+                    Eigen::Matrix3d &R_imu_lidar, 
+                    Eigen::Vector3d &t_imu_lidar){
      Eigen::Vector3d t;
      Eigen::Matrix3d R;
      double alpha_time = point_temp.alpha_time;
-     switch (compensation)
-     {
+     switch (compensation){
+
+     
      case MotionCompensation::NONE:
      case MotionCompensation::CONSTANT_VELOCITY:
-          R = q_end.toRotationMatrix();
+          R = q_end.toRotationMatrix(); // NONE和CONSTANT_VELOCITY执行此处
           t = t_end;
           break;
      case MotionCompensation::CONTINUOUS:
      case MotionCompensation::ITERATIVE:
-          R = q_begin.slerp(alpha_time, q_end).normalized().toRotationMatrix();
+          R = q_begin.slerp(alpha_time, q_end).normalized().toRotationMatrix();  // CONTINOUS 和  ITERATIVE 执行此处
           t = (1.0 - alpha_time) * t_begin + alpha_time * t_end;
           break;
      }

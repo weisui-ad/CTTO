@@ -7,17 +7,16 @@
 namespace zjloc
 {
 
-    void CloudConvert::Process(const livox_ros_driver::CustomMsg::ConstPtr &msg, std::vector<point3D> &pcl_out)
-    {
+    void CloudConvert::Process(const livox_ros_driver::CustomMsg::ConstPtr &msg,
+         std::vector<point3D> &pcl_out){
         AviaHandler(msg);
         pcl_out = cloud_out_;
     }
 
     void CloudConvert::Process(const sensor_msgs::PointCloud2::ConstPtr &msg,
-                               std::vector<point3D> &pcl_out)
-    {
-        switch (lidar_type_)
-        {
+                               std::vector<point3D> &pcl_out){
+        switch (lidar_type_){
+        
         case LidarType::OUST64:
             Oust64Handler(msg);
             break;
@@ -45,8 +44,8 @@ namespace zjloc
         pcl_out = cloud_out_;
     }
 
-    void CloudConvert::AviaHandler(const livox_ros_driver::CustomMsg::ConstPtr &msg)
-    {
+    void CloudConvert::AviaHandler(const livox_ros_driver::CustomMsg::ConstPtr &msg){
+
         cloud_out_.clear();
         cloud_full_.clear();
 
@@ -57,15 +56,14 @@ namespace zjloc
         // ns
         static double tm_scale = 1e9;
 
-        // 点云帧的时间戳
+        // 点云帧的时间戳 in seconds
         double headertime = msg->header.stamp.toSec();
 
-        // 点云的时间跨度
+        // 点云的时间跨度, 有属性offset_time (ns)，有line的属性 (int)
         timespan_ = msg->points.back().offset_time / tm_scale;
 
         // std::cout << "span:" << timespan_ << ",0: " << msg->points[0].offset_time / tm_scale
         //           << " , 100: " << msg->points[100].offset_time / tm_scale << std::endl;
-
         // 遍历每一个点
         for (int i = 0; i < plsize; i++){
 
@@ -75,7 +73,7 @@ namespace zjloc
                   std::isfinite(msg->points[i].z)))
                 continue;
 
-            // 判断每个点的时间戳是否正常
+            // 判断每个点的时间戳是否正常，不能大于最后一个点的timespan_
             if (msg->points[i].offset_time / tm_scale > timespan_)
                 std::cout << "------" << __FUNCTION__ << ", " << __LINE__ << ", error timespan:" << timespan_ << " < " << msg->points[i].offset_time << std::endl;
 
@@ -84,10 +82,11 @@ namespace zjloc
                 continue;
 
             //计算点的距离
-            double range = msg->points[i].x * msg->points[i].x + msg->points[i].y * msg->points[i].y +
-                           msg->points[i].z * msg->points[i].z;
+            double range = msg->points[i].x * msg->points[i].x + 
+                            msg->points[i].y * msg->points[i].y +
+                            msg->points[i].z * msg->points[i].z;
 
-            // 过滤掉盲区以内的点以及超过距离限制的点
+            // 过滤掉盲区以内的点以及超过距离限制的点,保留[0.1m， 250m]的点
             if (range > 250 * 250 || range < blind * blind)
                 continue;
 
@@ -95,12 +94,12 @@ namespace zjloc
             if (/*(msg->points[i].line < N_SCANS) &&*/ ((msg->points[i].tag & 0x30) == 0x10 || (msg->points[i].tag & 0x30) == 0x00))
             {
                 point3D point_temp;
-                // 点坐标
+                // raw_point是原始点，point是世界坐标系下的点，初始时默认两者相同
                 point_temp.raw_point = Eigen::Vector3d(msg->points[i].x, msg->points[i].y, msg->points[i].z);
                 point_temp.point = point_temp.raw_point;
 
-                // 每个点的相对时间起始点时间戳(ms)
-                point_temp.relative_time = msg->points[i].offset_time / tm_scale; // curvature unit: ms
+                // 每个点的相对时间起始点时间戳(s)
+                point_temp.relative_time = msg->points[i].offset_time / tm_scale; // curvature unit: s
 
                 // 每个点的反射率
                 point_temp.intensity = msg->points[i].reflectivity;
@@ -114,7 +113,7 @@ namespace zjloc
                 // 点云的时间跨度
                 point_temp.timespan = timespan_;
 
-                // 每个点的线数// 对应行数
+                // 每个点的线数// 对应行数 // 属性 line [int]
                 point_temp.ring = msg->points[i].line;
 
                 cloud_out_.push_back(point_temp);

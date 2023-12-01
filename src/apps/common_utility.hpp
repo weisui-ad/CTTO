@@ -16,6 +16,7 @@
 #include <tr1/unordered_map>
 #include "common/cloudMap.hpp"
 
+//velodynePointXYZIRT
 struct VelodynePointXYZIRT
 {
      PCL_ADD_POINT4D
@@ -55,8 +56,14 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(rsPointXYZIRT,
 
 typedef pcl::PointXYZI PointType;
 
+/**
+ * 
+*/
 void subSampleFrame0(std::vector<point3D> &frame, double size_voxel);
 
+/**
+ * 
+*/
 void gridSampling0(const pcl::PointCloud<pcl::PointXYZI>::Ptr &frame, pcl::PointCloud<pcl::PointXYZI>::Ptr &keypoints, double size_voxel_subsampling);
 
 #endif

@@ -56,7 +56,9 @@ namespace zjloc
         void LoadFromYAML(const std::string &yaml);
 
         //  返回激光的时间
-        double getTimeSpan() { return timespan_; }
+        double getTimeSpan() { 
+            return timespan_;
+        }
 
         LidarType lidar_type_ = LidarType::AVIA; // 雷达类型
 
