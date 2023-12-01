@@ -49,14 +49,15 @@ namespace CT_ICP
           return true;
      }
 
-     CTLidarPlaneNormFactor::CTLidarPlaneNormFactor(const Eigen::Vector3d &raw_keypoint_, const Eigen::Vector3d &norm_vector_, const double norm_offset_, double alpha_time_, double weight_)
-         : norm_vector(norm_vector_), norm_offset(norm_offset_), alpha_time(alpha_time_), weight(weight_)
-     {
+     CTLidarPlaneNormFactor::CTLidarPlaneNormFactor(const Eigen::Vector3d &raw_keypoint_, 
+                                                    const Eigen::Vector3d &norm_vector_, 
+                                                    const double norm_offset_,
+                                                    double alpha_time_, 
+                                                    double weight_): norm_vector(norm_vector_), norm_offset(norm_offset_), alpha_time(alpha_time_), weight(weight_){
           raw_keypoint = q_il * raw_keypoint_ + t_il;
      }
 
-     bool CTLidarPlaneNormFactor::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const
-     {
+     bool CTLidarPlaneNormFactor::Evaluate(double const *const *parameters, double *residuals, double **jacobians) const{
 
           const Eigen::Vector3d tran_begin(parameters[0][0], parameters[0][1], parameters[0][2]);
           const Eigen::Vector3d tran_end(parameters[2][0], parameters[2][1], parameters[2][2]);
@@ -66,8 +67,10 @@ namespace CT_ICP
           Eigen::Quaterniond rot_slerp = rot_begin.slerp(alpha_time, rot_end);
           rot_slerp.normalize();
           Eigen::Vector3d tran_slerp = tran_begin * (1 - alpha_time) + tran_end * alpha_time;
+          // 去运动畸变
           Eigen::Vector3d point_world = rot_slerp * raw_keypoint + tran_slerp;
 
+          // 计算距离
           double distance = norm_vector.dot(point_world) + norm_offset;
 
           residuals[0] = sqrt_info * weight * distance;

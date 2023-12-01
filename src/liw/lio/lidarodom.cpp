@@ -227,7 +227,7 @@ namespace zjloc
                // Eigen::Vector3d vel_base = pred_pose.rotationMatrix().inverse()*vel_world;
                // pub_data_to_ros(laser_topic, vel_base.x(), 0);
                if(index_frame%8==0){
-                    
+
                     laser_topic = "dist";
                     static Eigen::Vector3d last_t = Eigen::Vector3d::Zero();
                     Eigen::Vector3d t = pose_of_lo_.translation();
@@ -377,6 +377,7 @@ namespace zjloc
                int surf_num = 0;
                if (options_.log_print)
                     std::cout << "get factor: " << surfFactor.size() << std::endl;
+                    
                for (auto &e : surfFactor){
                     surf_num++;
                     switch (options_.icpmodel){
@@ -510,22 +511,22 @@ namespace zjloc
           transformKeypoints(p_frame->point_surf);
      }
 
-     Neighborhood lidarodom::computeNeighborhoodDistribution(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> &points)
-     {
+     Neighborhood lidarodom::computeNeighborhoodDistribution(const std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> &points){
+         
           Neighborhood neighborhood;
           // Compute the normals
+
+          // 计算中心点
           Eigen::Vector3d barycenter(Eigen::Vector3d(0, 0, 0));
-          for (auto &point : points)
-          {
+          for (auto &point : points){
                barycenter += point;
           }
-
           barycenter /= (double)points.size();
           neighborhood.center = barycenter;
 
+          // 计算协方差矩阵
           Eigen::Matrix3d covariance_Matrix(Eigen::Matrix3d::Zero());
-          for (auto &point : points)
-          {
+          for (auto &point : points){
                for (int k = 0; k < 3; ++k)
                     for (int l = k; l < 3; ++l)
                          covariance_Matrix(k, l) += (point(k) - barycenter(k)) *
@@ -536,34 +537,43 @@ namespace zjloc
           covariance_Matrix(2, 1) = covariance_Matrix(1, 2);
           neighborhood.covariance = covariance_Matrix;
           Eigen::SelfAdjointEigenSolver<Eigen::Matrix3d> es(covariance_Matrix);
-          Eigen::Vector3d normal(es.eigenvectors().col(0).normalized());
+          Eigen::Vector3d normal(es.eigenvectors().col(0).normalized()); // 法向量是最小的特征值对应的特征向量
           neighborhood.normal = normal;
 
+          // 奇异值 倒数第二小的奇值于第二小的比值， sigma_3要远小于sigma_1和sigma_2
           double sigma_1 = sqrt(std::abs(es.eigenvalues()[2]));
           double sigma_2 = sqrt(std::abs(es.eigenvalues()[1]));
           double sigma_3 = sqrt(std::abs(es.eigenvalues()[0]));
           neighborhood.a2D = (sigma_2 - sigma_3) / sigma_1;
 
-          if (neighborhood.a2D != neighborhood.a2D)
-          {
+          // 排除NAN
+          if (neighborhood.a2D != neighborhood.a2D){
                throw std::runtime_error("error");
           }
 
           return neighborhood;
      }
 
-     void lidarodom::addSurfCostFactor(std::vector<ceres::CostFunction *> &surf, std::vector<Eigen::Vector3d> &normals,
-                                       std::vector<point3D> &keypoints, const cloudFrame *p_frame)
-     {
+     /**
+      * @param surf -- 代价函数
+      * @param normals -- 对应的法向量
+      * @param keypoints -- 当前帧降采样之后的关键点
+     */
+     void lidarodom::addSurfCostFactor(std::vector<ceres::CostFunction *> &surf, 
+                                       std::vector<Eigen::Vector3d> &normals,
+                                       std::vector<point3D> &keypoints, 
+                                       const cloudFrame *p_frame){
 
-          auto estimatePointNeighborhood = [&](std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> &vector_neighbors,
-                                               Eigen::Vector3d &location, double &planarity_weight)
-          {
+          
+          auto estimatePointNeighborhood = [&](std::vector<Eigen::Vector3d, 
+                                               Eigen::aligned_allocator<Eigen::Vector3d>> &vector_neighbors,
+                                               Eigen::Vector3d &location, 
+                                               double &planarity_weight){
+
                auto neighborhood = computeNeighborhoodDistribution(vector_neighbors);
                planarity_weight = std::pow(neighborhood.a2D, options_.power_planarity);
 
-               if (neighborhood.normal.dot(p_frame->p_state->translation_begin - location) < 0)
-               {
+               if (neighborhood.normal.dot(p_frame->p_state->translation_begin - location) < 0){
                     neighborhood.normal = -1.0 * neighborhood.normal;
                }
                return neighborhood;
@@ -585,14 +595,15 @@ namespace zjloc
                                              ? 1
                                              : options_.threshold_voxel_occupancy;
 
+          // 遍历每一个点，计算最近邻，并且
           size_t num = keypoints.size();
           int num_residuals = 0;
+          for (int k = 0; k < num; k++){
 
-          for (int k = 0; k < num; k++)
-          {
                auto &keypoint = keypoints[k];
-               auto &raw_point = keypoint.raw_point;
+               auto &raw_point = keypoint.raw_point;  // 原始点的坐标
 
+               // 计算最近邻，以及最近邻对应的voxel，注意用的是世界坐标系中的点计算的
                std::vector<voxel> voxels;
                auto vector_neighbors = searchNeighbors(voxel_map, keypoint.point,
                                                        nb_voxels_visited,
@@ -602,7 +613,7 @@ namespace zjloc
                                                        options_.estimate_normal_from_neighborhood
                                                            ? nullptr
                                                            : &voxels);
-
+               // 少于设置的最少点的个数，则不构造约束, min_number_neighbors = 20
                if (vector_neighbors.size() < options_.min_number_neighbors)
                     continue;
 
@@ -610,8 +621,10 @@ namespace zjloc
 
                Eigen::Vector3d location = TIL_ * raw_point;
 
+               // 估计最近邻的法向量等信息
                auto neighborhood = estimatePointNeighborhood(vector_neighbors, location /*raw_point*/, weight);
 
+               // 平面性越强，权重越大；距离越近，权重越大
                weight = lambda_weight * weight + lambda_neighborhood *
                                                      std::exp(-(vector_neighbors[0] -
                                                                 keypoint.point)
@@ -619,14 +632,15 @@ namespace zjloc
                                                               (kMaxPointToPlane *
                                                                options_.min_number_neighbors));
 
+               // 对于每个最近邻，计算垂直距离
                double point_to_plane_dist;
                std::set<voxel> neighbor_voxels;
-               for (int i(0); i < options_.num_closest_neighbors; ++i)
-               {
+               for (int i(0); i < options_.num_closest_neighbors; ++i){
+                    
                     point_to_plane_dist = std::abs((keypoint.point - vector_neighbors[i]).transpose() * neighborhood.normal);
 
-                    if (point_to_plane_dist < options_.max_dist_to_plane_icp)
-                    {
+                    // 垂直距离在范围内
+                    if (point_to_plane_dist < options_.max_dist_to_plane_icp){
 
                          num_residuals++;
 
@@ -637,8 +651,8 @@ namespace zjloc
 
                          double norm_offset = -norm_vector.dot(vector_neighbors[i]);
 
-                         switch (options_.icpmodel)
-                         {
+                         switch (options_.icpmodel){
+
                          case IcpModel::CT_POINT_TO_PLANE:
                          {
 #ifdef USE_ANALYTICAL_DERIVATE
@@ -679,6 +693,7 @@ namespace zjloc
           }
      }
 
+
      ///  ===================  for search neighbor  ===================================================
      using pair_distance_t = std::tuple<double, Eigen::Vector3d, voxel>;
 
@@ -696,43 +711,46 @@ namespace zjloc
      lidarodom::searchNeighbors(const voxelHashMap &map, const Eigen::Vector3d &point,
                                 int nb_voxels_visited, double size_voxel_map,
                                 int max_num_neighbors, int threshold_voxel_capacity,
-                                std::vector<voxel> *voxels)
-     {
+                                std::vector<voxel> *voxels){
 
           if (voxels != nullptr)
                voxels->reserve(max_num_neighbors);
 
+          // 计算点所在的voxel id
           short kx = static_cast<short>(point[0] / size_voxel_map);
           short ky = static_cast<short>(point[1] / size_voxel_map);
           short kz = static_cast<short>(point[2] / size_voxel_map);
 
+          // 遍历2*nb_voxels_visited 中的点云
           priority_queue_t priority_queue;
-
           voxel voxel_temp(kx, ky, kz);
-          for (short kxx = kx - nb_voxels_visited; kxx < kx + nb_voxels_visited + 1; ++kxx)
-          {
-               for (short kyy = ky - nb_voxels_visited; kyy < ky + nb_voxels_visited + 1; ++kyy)
-               {
-                    for (short kzz = kz - nb_voxels_visited; kzz < kz + nb_voxels_visited + 1; ++kzz)
-                    {
+          for (short kxx = kx - nb_voxels_visited; kxx < kx + nb_voxels_visited + 1; ++kxx){
+               for (short kyy = ky - nb_voxels_visited; kyy < ky + nb_voxels_visited + 1; ++kyy){
+                    for (short kzz = kz - nb_voxels_visited; kzz < kz + nb_voxels_visited + 1; ++kzz){
+                         
                          voxel_temp.x = kxx;
                          voxel_temp.y = kyy;
                          voxel_temp.z = kzz;
 
+                         // 搜索对应的voxel
                          auto search = map.find(voxel_temp);
-                         if (search != map.end())
-                         {
+                         if (search != map.end()){
+
                               const auto &voxel_block = search.value();
+                              // threshold_voxel_capacity=1 voxel中点的个数为0 则跳过
                               if (voxel_block.NumPoints() < threshold_voxel_capacity)
                                    continue;
-                              for (int i(0); i < voxel_block.NumPoints(); ++i)
-                              {
+
+                              // 遍历voxel中的每个点
+                              for (int i(0); i < voxel_block.NumPoints(); ++i){
+
                                    auto &neighbor = voxel_block.points[i];
                                    double distance = (neighbor - point).norm();
-                                   if (priority_queue.size() == max_num_neighbors)
-                                   {
-                                        if (distance < std::get<0>(priority_queue.top()))
-                                        {
+
+                                   // 如果已经超过了最大的邻域个数，且当neighbr到point的距离小于priority_queue中的最大距离，则将距离最大的点剔除，并换成当前的neightbor
+                                   // priority_queue中，将点按照距离远近进行排序，get<0>表示取第0个通道，get<1> 表示取第一个通道
+                                   if (priority_queue.size() == max_num_neighbors){
+                                        if (distance < std::get<0>(priority_queue.top())){
                                              priority_queue.pop();
                                              priority_queue.emplace(distance, neighbor, voxel_temp);
                                         }
@@ -747,12 +765,10 @@ namespace zjloc
 
           auto size = priority_queue.size();
           std::vector<Eigen::Vector3d, Eigen::aligned_allocator<Eigen::Vector3d>> closest_neighbors(size);
-          if (voxels != nullptr)
-          {
+          if (voxels != nullptr){
                voxels->resize(size);
           }
-          for (auto i = 0; i < size; ++i)
-          {
+          for (auto i = 0; i < size; ++i){
                closest_neighbors[size - 1 - i] = std::get<1>(priority_queue.top());
                if (voxels != nullptr)
                     (*voxels)[size - 1 - i] = std::get<2>(priority_queue.top());

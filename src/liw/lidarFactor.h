@@ -18,7 +18,7 @@
 namespace CT_ICP
 {
      struct FunctorPointToPlane{
-          
+
           static constexpr int NumResiduals() { return 1; }
 
           FunctorPointToPlane(const Eigen::Vector3d &reference,
@@ -489,8 +489,7 @@ namespace CT_ICP
           double weight_ = 1.0;
      };
 
-     struct LocationConsistencyFunctor
-     {
+     struct LocationConsistencyFunctor{
 
           static constexpr int NumResiduals() { return 3; }
 
