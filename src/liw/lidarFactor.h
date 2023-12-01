@@ -17,8 +17,8 @@
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 namespace CT_ICP
 {
-     struct FunctorPointToPlane
-     {
+     struct FunctorPointToPlane{
+          
           static constexpr int NumResiduals() { return 1; }
 
           FunctorPointToPlane(const Eigen::Vector3d &reference,

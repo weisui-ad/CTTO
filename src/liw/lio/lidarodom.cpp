@@ -226,8 +226,8 @@ namespace zjloc
                // Eigen::Vector3d vel_world = eskf_.GetNominalVel();
                // Eigen::Vector3d vel_base = pred_pose.rotationMatrix().inverse()*vel_world;
                // pub_data_to_ros(laser_topic, vel_base.x(), 0);
-               if(index_frame%8==0)
-               {
+               if(index_frame%8==0){
+                    
                     laser_topic = "dist";
                     static Eigen::Vector3d last_t = Eigen::Vector3d::Zero();
                     Eigen::Vector3d t = pose_of_lo_.translation();
