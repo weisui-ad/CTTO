@@ -438,7 +438,7 @@ namespace zjloc
                }
 
                ceres::Solver::Options options;
-               options.max_num_iterations = 5;
+               options.max_num_iterations = 7;
                options.num_threads = 3;
                options.minimizer_progress_to_stdout = false;
                options.trust_region_strategy_type = ceres::TrustRegionStrategyType::LEVENBERG_MARQUARDT;

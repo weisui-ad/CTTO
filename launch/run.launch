@@ -11,6 +11,4 @@
     <node launch-prefix="nice" pkg="rviz" type="rviz" name="rviz" args="-d $(find ctlo)/launch/rviz.rviz" />
   </group>
 
-
-
 </launch>

@@ -31,7 +31,7 @@ namespace zjloc
             ROBOSENSE16, //  速腾16线
             PANDAR,
             LIVOX,
-            DTOF         // DTOF
+            DTOF,         // DTOF
         };
 
         CloudConvert() = default;

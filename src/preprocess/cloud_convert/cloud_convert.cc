@@ -1,5 +1,7 @@
 #include "cloud_convert.h"
 
+#include "tools/tool_color_printf.hpp"
+
 #include <glog/logging.h>
 #include <yaml-cpp/yaml.h>
 // #include <execution>
@@ -424,6 +426,7 @@ namespace zjloc
 
         // 点云的时间戳
         double headertime = msg->header.stamp.toSec();
+        //std::cout << ANSI_COLOR_GREEN << "header time ..."<<headertime << ANSI_COLOR_RESET << std::endl;
         //  FIXME:  时间戳大于0.1
         auto time_list_dtof = [&](dtof_ros::Point &point_1, dtof_ros::Point &point_2){
             return (point_1.timestamp < point_2.timestamp);
@@ -438,6 +441,10 @@ namespace zjloc
 
         // 计算timespan_
         timespan_ = pl_orig.points.back().timestamp - pl_orig.points[0].timestamp;
+        // std::cout << ANSI_COLOR_GREEN << "  time span  ..."<<std::setprecision(13)<<timespan_ << ANSI_COLOR_RESET << std::endl;
+        // std::cout << ANSI_COLOR_GREEN << "  time begin: "<<std::setprecision(13)<<pl_orig.points[0].timestamp
+        //                               << "  time end: "<<pl_orig.points.back().timestamp<< ANSI_COLOR_RESET <<std::endl;
+
         for (int i = 0; i < pl_orig.points.size(); i++){
            
             // if (i % point_filter_num_ != 0)
@@ -470,6 +477,10 @@ namespace zjloc
 
             cloud_out_.push_back(point_temp);
         }
+
+        // std::cout << ANSI_COLOR_GREEN << " alpha time begin: "<<std::setprecision(13)<<cloud_out_[0].alpha_time
+        //                               << " alpha time end: "<<cloud_out_.back().alpha_time<< ANSI_COLOR_RESET <<std::endl;
+
     }
 
     void CloudConvert::LoadFromYAML(const std::string &yaml_file)
@@ -509,6 +520,11 @@ namespace zjloc
         {
             lidar_type_ = LidarType::LIVOX;
             LOG(INFO) << "Using Livox Lidar (sensor_msgs/PointCloud2)";
+        }
+        else if (lidar_type == 7)
+        {
+            lidar_type_ = LidarType::DTOF;
+            LOG(INFO) << "Using DTof Lidar (sensor_msgs/PointCloud2)";
         }
         else
         {

@@ -60,13 +60,14 @@ void livox_pcl_cbk(const livox_ros_driver::CustomMsg::ConstPtr &msg){
         std::shuffle(cloud_out.begin(), cloud_out.end(), g); },"laser ds");
 
     lio->pushData(cloud_out, std::make_pair(msg->header.stamp.toSec(), convert->getTimeSpan()));
-    //std::cout<<"  done"<<std::endl;
+    std::cout<<"  done"<<std::endl;
 }
 
 void standard_pcl_cbk(const sensor_msgs::PointCloud2::ConstPtr &msg){
 
     sensor_msgs::PointCloud2::Ptr cloud(new sensor_msgs::PointCloud2(*msg));
 
+    
     std::vector<point3D> cloud_out;
     zjloc::common::Timer::Evaluate([&]()
                                    { convert->Process(msg, cloud_out); },
