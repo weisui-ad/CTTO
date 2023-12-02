@@ -82,7 +82,7 @@ void subSampleFrame(std::vector<point3D> &frame, double size_voxel){
      frame.resize(0);
      int step = 0;
      for (const auto &n : grid){
-          if (n.second.size() > 0{
+          if (n.second.size() > 0){
                frame.push_back(n.second[0]);
                step++;
           }
